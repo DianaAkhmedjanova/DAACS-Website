@@ -64,7 +64,7 @@ server <- function(input, output, session) {
 		for(i in names(tmp)) {
 			feedback[[i]] <- tmp[[i]]
 		}
-})
+	})
 	
 	output$domainUI <- renderUI({
 		domains <- names(feedback[[input$subject]])[
