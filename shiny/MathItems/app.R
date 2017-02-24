@@ -8,56 +8,26 @@ items.dir <- 'repo/assessments/mathematics/items/'
 
 # Download the assessment repo
 path <- file.path('repo')
+repo <- NULL
 if(dir.exists(path)) {
-	unlink(path, recursive = TRUE, force = TRUE)
+	#unlink(path, recursive = TRUE, force = TRUE)
+	repo <- repository(path)
+} else {
+	dir.create(path, recursive=TRUE)
+	repo <- clone(repo.url, path)
 }
-dir.create(path, recursive=TRUE)
-repo <- clone(repo.url, path)
+config(repo, user.name = 'jbryer', user.email = 'jason@bryer.org')
 
-# Copy the image files to the www directory
 dir.create(file.path('www'), recursive = TRUE)
-file.copy(paste0('repo/assessments/mathematics/items/',
-				 list.files('repo/assessments/mathematics/items', pattern='*.png')),
-		  paste0('www/',
-		  	     list.files('repo/assessments/mathematics/items', pattern='*.png'))
-)
-file.copy(paste0('repo/assessments/mathematics/figures/',
-				 list.files('repo/assessments/mathematics/figures', pattern='*.png')),
-		  paste0('www/',
- 		   	     list.files('repo/assessments/mathematics/figures', pattern='*.png'))
-)
 
-items <- read.xls('repo/assessments/mathematics/MathItems.xlsx', stringsAsFactors=FALSE, verbose = FALSE)
-items <- items[items$Domain != '',]
-
-domains <- unique(items$Domain)
-domains <- domains[domains != '']
-
-items$Filename <- paste0(items$State, '-', items$Year, '-',
-						 formatC(items$Month, width=2, flag='0'), '-',
-						 formatC(items$ItemNum, width=2, flag='0'), '.md')
-
-feedback <- list()
-for(i in items$Filename) { # Read the feedback MD files
-	if(file.exists(paste0(items.dir, i))) {
-		 feedback[[i]] <- paste0(scan(paste0(items.dir, i),
-		 							 what = character(),
-		 							 sep = '\n',
-		 							 blank.lines.skip = FALSE,
-		 							 quiet = TRUE),
-		 						collapse = '\n')
-	}
-}
-
-#items <- items[items$Filename %in% names(feedback),]
-
+##### UI
 ui <- fluidPage(
 	withMathJax(),
 
 	titlePanel("DAACS Mathematics Item Viewer"),
 
 	fluidRow(
-		column(width = 3, selectInput('domain', 'Domain', domains),
+		column(width = 3, uiOutput('domainsUI'),
 			              checkboxInput('itemsWithFeedback', 'Items with feedback only', value=TRUE)),
 		column(width = 2, div(actionButton('previousItem', 'Previous')), style='text-align:right'),
 		column(width = 3, div(uiOutput('itemSelect')), style='text-align:center'),
@@ -79,19 +49,80 @@ ui <- fluidPage(
 			 	    h5('D) '), htmlOutput('choiceD'))
 	), hr(),
 	fluidRow(column(width = 12,
-			h3(htmlOutput('answer')),
-			uiOutput('editbuttonui'),
-			h3('Feedback:'),
-			#uiOutput('feedbackUI'),
-	      	htmlOutput('feedback')
-		)
+			h3(htmlOutput('answer')) )
+	),
+	fluidRow(column(width = 4, uiOutput('editbuttonui')),
+			 column(width = 4, actionButton('refresh', 'Refresh Feedback', icon('refresh')))
+	),
+	fluidRow(column(width = 12,
+			 h3('Feedback:'),
+			 #uiOutput('feedbackUI'),
+	      	 htmlOutput('feedback') )
 	)
 )
 
-# Define server logic required to draw a histogram
+##### Define server logic required to draw a histogram
 server <- function(input, output, session) {
+	feedback <- reactiveValues()
+	math.items <- reactiveValues()
+
+	updateRepo <- function() {
+		pull(repo)
+		
+		# Copy the image files to the www directory
+		file.copy(paste0('repo/assessments/mathematics/items/',
+						 list.files('repo/assessments/mathematics/items', pattern='*.png')),
+				  paste0('www/',
+				  	   list.files('repo/assessments/mathematics/items', pattern='*.png'))
+		)
+		file.copy(paste0('repo/assessments/mathematics/figures/',
+						 list.files('repo/assessments/mathematics/figures', pattern='*.png')),
+				  paste0('www/',
+				  	   list.files('repo/assessments/mathematics/figures', pattern='*.png'))
+		)
+		
+		items <- read.xls('repo/assessments/mathematics/MathItems.xlsx', stringsAsFactors=FALSE, verbose = FALSE)
+		items <- items[items$Domain != '',]
+		
+		domains <- unique(items$Domain)
+		domains <- domains[domains != '']
+		
+		items$Filename <- paste0(items$State, '-', items$Year, '-',
+								 formatC(items$Month, width=2, flag='0'), '-',
+								 formatC(items$ItemNum, width=2, flag='0'), '.md')
+		
+		tmp <- list()
+		for(i in items$Filename) { # Read the feedback MD files
+			if(file.exists(paste0(items.dir, i))) {
+				tmp[[i]] <- paste0(scan(paste0(items.dir, i),
+											 what = character(),
+											 sep = '\n',
+											 blank.lines.skip = FALSE,
+											 quiet = TRUE),
+										collapse = '\n')
+			}
+		}
+
+		for(i in names(tmp)) {
+			feedback[[i]] <- tmp[[i]]
+		}
+		
+		math.items$items <- items
+		math.items$domains <- domains
+	}
+	
+	updateRepo()
+	
+	observeEvent(input$refresh, {
+		updateRepo()
+	})
+	
+	output$domainsUI <- renderUI({
+		selectInput('domain', 'Domain', math.items$domains)
+	})
+
 	observeEvent(input$nextItem, {
-		choices <- items[items$Domain == input$domain,]
+		choices <- math.items$items[math.items$items$Domain == input$domain,]
 		if(input$itemsWithFeedback) {
 			choices <- choices[choices$Filename %in% names(feedback),]
 		}
@@ -102,7 +133,7 @@ server <- function(input, output, session) {
 	})
 	
 	observeEvent(input$previousItem, {
-		choices <- items[items$Domain == input$domain,]
+		choices <- math.items$items[math.items$items$Domain == input$domain,]
 		if(input$itemsWithFeedback) {
 			choices <- choices[choices$Filename %in% names(feedback),]
 		}
@@ -114,7 +145,7 @@ server <- function(input, output, session) {
 
 	output$itemSelect <- renderUI({
 		req(input$domain)
-		choices <- items[items$Domain == input$domain,]
+		choices <- math.items$items[math.items$items$Domain == input$domain,]
 		if(input$itemsWithFeedback) {
 			choices <- choices[choices$Filename %in% names(feedback),]
 		}
@@ -122,37 +153,37 @@ server <- function(input, output, session) {
 	})
 
 	output$stem <- renderText({
-		html <- items[items$Filename == input$item,]$Stem
+		html <- math.items$items[math.items$items$Filename == input$item,]$Stem
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$choiceA <- renderText({
-		html <- items[items$Filename == input$item,]$A
+		html <- math.items$items[math.items$items$Filename == input$item,]$A
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$choiceB <- renderText({
-		html <- items[items$Filename == input$item,]$B
+		html <- math.items$items[math.items$items$Filename == input$item,]$B
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$choiceC <- renderText({
-		html <- items[items$Filename == input$item,]$C
+		html <- math.items$items[math.items$items$Filename == input$item,]$C
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$choiceD <- renderText({
-		html <- items[items$Filename == input$item,]$D
+		html <- math.items$items[math.items$items$Filename == input$item,]$D
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$answer <- renderText({
-		paste0('Answer: ', items[items$Filename == input$item,]$Answer)
+		paste0('Answer: ', math.items$items[math.items$items$Filename == input$item,]$Answer)
 	})
 
 	output$feedbackUI <- renderUI({
