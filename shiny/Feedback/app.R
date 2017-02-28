@@ -139,7 +139,17 @@ server <- function(input, output, session) {
 							  				 "/", input$domain, "/", 
 							  				 input$level, ".md', '_blank')"))
 			parts[[length(parts) + 1]] <- hr()
-			parts[[length(parts) + 1]] <- p('Item results here...')
+			if(input$subject == 'mathematics') {
+				parts[[length(parts) + 1]] <- p("Mathematic items shown here. View all reading items here:")
+				parts[[length(parts) + 1]] <- a('shiny.daacs.net/shiny/MathItems', href='http://shiny.daacs.net/shiny/MathItems/', 
+												target='_blank')
+			} else if(input$subject == 'reading') {
+				parts[[length(parts) + 1]] <- p('Reading items shown here. View all mathematics items here:')
+				parts[[length(parts) + 1]] <- a('shiny.daacs.net/shiny/ReadingItems', href='http://shiny.daacs.net/shiny/ReadingItems/', 
+												target='_blank')
+			} else if(input$subject == 'writing') {
+				parts[[length(parts) + 1]] <- p("Student's essay shown here...")
+			}
 			parts[[length(parts) + 1]] <- hr()
 			parts[[length(parts) + 1]] <- HTML(feedback[[input$subject]][[input$domain]][['overview']])
 			parts[[length(parts) + 1]] <- shiny::actionButton(inputId = paste0('ID', round(runif(1) * 100000)), 
@@ -178,7 +188,11 @@ server <- function(input, output, session) {
 											 "/", input$domain, "/", input$secondaryDomain, "/", 
 											 input$level, ".md', '_blank')"))
 				parts[[length(parts) + 1]] <- hr()
-				parts[[length(parts) + 1]] <- p('Item results here...')
+				parts[[length(parts) + 1]] <- p('SRL item results here...')
+				parts[[length(parts) + 1]] <- HTML(
+					paste0("<ul>", paste0(paste0("<li>", 
+							trim(substr(srl.items[srl.items$SecondaryFactor == toTitleCase(input$secondaryDomain),]$Stem, 4, 1000)),
+							"</li>"), collapse = ''), "</ul>") )
 				parts[[length(parts) + 1]] <- hr()
 				parts[[length(parts) + 1]] <- HTML(feedback[[input$subject]][[input$domain]][[input$secondaryDomain]][['overview']])
 				parts[[length(parts) + 1]] <- shiny::actionButton(inputId = paste0('ID', round(runif(1) * 100000)), 
