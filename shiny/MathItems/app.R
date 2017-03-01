@@ -51,7 +51,8 @@ ui <- fluidPage(
 	fluidRow(column(width = 12,
 			h3(htmlOutput('answer')) )
 	),
-	fluidRow(column(width = 4, uiOutput('editbuttonui')),
+	fluidRow(column(width = 4, uiOutput('edititembuttonui')),
+		     column(width = 4, uiOutput('editfeedbackbuttonui')),
 			 column(width = 4, actionButton('refresh', 'Refresh Feedback', icon('refresh')))
 	),
 	fluidRow(column(width = 12,
@@ -81,15 +82,30 @@ server <- function(input, output, session) {
 				  	   list.files('repo/assessments/mathematics/figures', pattern='*.png'))
 		)
 		
-		items <- read.xls('repo/assessments/mathematics/MathItems.xlsx', stringsAsFactors=FALSE, verbose = FALSE)
-		items <- items[items$Domain != '',]
+		items <- data.frame(Stem=character(), Domain=character(), DifficultyLevel=character(),
+							A=character(), B=character(), c=character(), D=character(),
+							Answer=character(), Filename=character(), stringsAsFactors = FALSE)
+		for(i in list.files('mathematics/items', pattern='.json')) {
+			tmp <- fromJSON(paste0('mathematics/items/', i))
+			items <- rbind(items, data.frame(
+				Stem = tmp$stem,
+				Domain = tmp$domain,
+				DifficultyLevel = tmp$difficulty,
+				A = tmp$A, B = tmp$B, C = tmp$C, D = tmp$D,
+				Answer = tmp$answer,
+				Filename = tmp$feedback,
+				stringsAsFactors = FALSE
+			))
+		}
+		# items <- read.xls('repo/assessments/mathematics/MathItems.xlsx', stringsAsFactors=FALSE, verbose = FALSE)
+		# items <- items[items$Domain != '',]
 		
 		domains <- unique(items$Domain)
 		domains <- domains[domains != '']
 		
-		items$Filename <- paste0(items$State, '-', items$Year, '-',
-								 formatC(items$Month, width=2, flag='0'), '-',
-								 formatC(items$ItemNum, width=2, flag='0'), '.md')
+		# items$Filename <- paste0(items$State, '-', items$Year, '-',
+		# 						 formatC(items$Month, width=2, flag='0'), '-',
+		# 						 formatC(items$ItemNum, width=2, flag='0'), '.md')
 		
 		tmp <- list()
 		for(i in items$Filename) { # Read the feedback MD files
@@ -149,51 +165,59 @@ server <- function(input, output, session) {
 		if(input$itemsWithFeedback) {
 			choices <- choices[choices$Filename %in% names(feedback),]
 		}
-		selectInput('item', NULL, choices = choices$Filename)
+		selectInput('item', NULL, choices = gsub('.md', '', choices$Filename))
 	})
 
 	output$stem <- renderText({
-		html <- math.items$items[math.items$items$Filename == input$item,]$Stem
+		html <- math.items$items[math.items$items$Filename == paste0(input$item, '.md'),]$Stem
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$choiceA <- renderText({
-		html <- math.items$items[math.items$items$Filename == input$item,]$A
+		html <- math.items$items[math.items$items$Filename == paste0(input$item, '.md'),]$A
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$choiceB <- renderText({
-		html <- math.items$items[math.items$items$Filename == input$item,]$B
+		html <- math.items$items[math.items$items$Filename == paste0(input$item, '.md'),]$B
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$choiceC <- renderText({
-		html <- math.items$items[math.items$items$Filename == input$item,]$C
+		html <- math.items$items[math.items$items$Filename == paste0(input$item, '.md'),]$C
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$choiceD <- renderText({
-		html <- math.items$items[math.items$items$Filename == input$item,]$D
+		html <- math.items$items[math.items$items$Filename == paste0(input$item, '.md'),]$D
 		html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 		return(html)
 	})
 
 	output$answer <- renderText({
-		paste0('Answer: ', math.items$items[math.items$items$Filename == input$item,]$Answer)
+		paste0('Answer: ', math.items$items[math.items$items$Filename == paste0(input$item, '.md'),]$Answer)
 	})
 
 	output$feedbackUI <- renderUI({
 		req(input$item)
-		textAreaInput('feedback', 'Feedback source', value = feedback[[input$item]],
+		textAreaInput('feedback', 'Feedback source', value = feedback[[paste0(input$item, '.md')]],
 					  width = '600px', height = '200px')
 	})
 
-	output$editbuttonui <- renderUI({
-		fname <- input$item
+	output$edititembuttonui <- renderUI({
+		fname <- paste0(input$item, '.json')
+		url <- paste0(repo.url, '/edit/master/assessments/mathematics/items/', fname)
+		shiny::actionButton(inputId='editbutton', label="Edit Item", 
+							icon = icon("pencil"), 
+							onclick =paste0("window.open('", url, "', '_blank')"))
+	})
+
+	output$editfeedbackbuttonui <- renderUI({
+		fname <- paste0(input$item, '.md')
 		url <- paste0(repo.url, '/edit/master/assessments/mathematics/items/', fname)
 		shiny::actionButton(inputId='editbutton', label="Edit Feedback", 
 							icon = icon("pencil"), 
@@ -205,7 +229,7 @@ server <- function(input, output, session) {
 		# req(input$feedback)
 		# html <- markdownToHTML(text = input$feedback, options=c('fragment_only'))
 		if(input$item %in% names(feedback)) {
-			html <- markdownToHTML(text = feedback[[input$item]], options=c('fragment_only'))
+			html <- markdownToHTML(text = feedback[[paste0(input$item, '.md')]], options=c('fragment_only'))
 			#if(grep('$$', feedback[[131]], fixed=TRUE) | grep('\\(', feedback[[131]], fixed=TRUE)) {
 				html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 			#}
