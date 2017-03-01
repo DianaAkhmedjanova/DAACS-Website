@@ -2,6 +2,7 @@ library(shiny)
 library(gdata)
 library(markdown)
 library(git2r)
+library(jsonlite)
 
 repo.url <- 'https://github.com/DAACS/DAACS-Website'
 items.dir <- 'repo/assessments/mathematics/items/'
