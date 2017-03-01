@@ -51,9 +51,9 @@ ui <- fluidPage(
 	fluidRow(column(width = 12,
 			h3(htmlOutput('answer')) )
 	),
-	fluidRow(column(width = 4, uiOutput('edititembuttonui')),
-		     column(width = 4, uiOutput('editfeedbackbuttonui')),
-			 column(width = 4, actionButton('refresh', 'Refresh Feedback', icon('refresh')))
+	fluidRow(column(width = 2, uiOutput('edititembuttonui')),
+		     column(width = 2, uiOutput('editfeedbackbuttonui')),
+			 column(width = 2, actionButton('refresh', 'Refresh Feedback', icon('refresh')))
 	),
 	fluidRow(column(width = 12,
 			 h3('Feedback:'),
@@ -85,8 +85,8 @@ server <- function(input, output, session) {
 		items <- data.frame(Stem=character(), Domain=character(), DifficultyLevel=character(),
 							A=character(), B=character(), c=character(), D=character(),
 							Answer=character(), Filename=character(), stringsAsFactors = FALSE)
-		for(i in list.files('mathematics/items', pattern='.json')) {
-			tmp <- fromJSON(paste0('mathematics/items/', i))
+		for(i in list.files('repo/assessments/mathematics/items', pattern='.json')) {
+			tmp <- fromJSON(paste0('repo/assessments/mathematics/items/', i))
 			items <- rbind(items, data.frame(
 				Stem = tmp$stem,
 				Domain = tmp$domain,
@@ -110,7 +110,7 @@ server <- function(input, output, session) {
 		tmp <- list()
 		for(i in items$Filename) { # Read the feedback MD files
 			if(file.exists(paste0(items.dir, i))) {
-				tmp[[i]] <- paste0(scan(paste0(items.dir, i),
+				tmp[[gsub('.md','',i)]] <- paste0(scan(paste0(items.dir, i),
 											 what = character(),
 											 sep = '\n',
 											 blank.lines.skip = FALSE,
@@ -140,9 +140,9 @@ server <- function(input, output, session) {
 	observeEvent(input$nextItem, {
 		choices <- math.items$items[math.items$items$Domain == input$domain,]
 		if(input$itemsWithFeedback) {
-			choices <- choices[choices$Filename %in% names(feedback),]
+			choices <- choices[choices$Filename %in% paste0(names(feedback), '.md'),]
 		}
-		choices <- choices$Filename
+		choices <- gsub('.md','', choices$Filename)
 		pos <- which(choices == input$item) + 1
 		if(pos > length(choices)) { pos <- 1 }
 		updateSelectInput(session, 'item', selected = choices[pos])
@@ -153,7 +153,7 @@ server <- function(input, output, session) {
 		if(input$itemsWithFeedback) {
 			choices <- choices[choices$Filename %in% names(feedback),]
 		}
-		choices <- choices$Filename
+		choices <- gsub('.md','', choices$Filename)
 		pos <- which(choices == input$item) - 1
 		if(pos < 1) { pos <- length(choices) }
 		updateSelectInput(session, 'item', selected = choices[pos])
@@ -163,7 +163,7 @@ server <- function(input, output, session) {
 		req(input$domain)
 		choices <- math.items$items[math.items$items$Domain == input$domain,]
 		if(input$itemsWithFeedback) {
-			choices <- choices[choices$Filename %in% names(feedback),]
+			choices <- choices[choices$Filename %in% paste0(names(feedback),'.md'),]
 		}
 		selectInput('item', NULL, choices = gsub('.md', '', choices$Filename))
 	})
@@ -229,7 +229,7 @@ server <- function(input, output, session) {
 		# req(input$feedback)
 		# html <- markdownToHTML(text = input$feedback, options=c('fragment_only'))
 		if(input$item %in% names(feedback)) {
-			html <- markdownToHTML(text = feedback[[paste0(input$item, '.md')]], options=c('fragment_only'))
+			html <- markdownToHTML(text = feedback[[input$item]], options=c('fragment_only'))
 			#if(grep('$$', feedback[[131]], fixed=TRUE) | grep('\\(', feedback[[131]], fixed=TRUE)) {
 				html <- paste(html, "<script>MathJax.Hub.Queue([\"Typeset\", MathJax.Hub]);</script>")
 			#}
