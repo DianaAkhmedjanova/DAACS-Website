@@ -1,4 +1,9 @@
+
 ## Additional Resources
+
+Here is a link providing information about using transitions in your writing: 
+
+* Transitions: http://owl.excelsior.edu/writing-process/paragraphing/paragraphing-and-transitioning/
 
 These resources provide information about organizing your writing:
 
